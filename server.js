@@ -323,6 +323,10 @@ if (process.env.NODE_ENV === "production") {
   });
 }
 
+app.get('/', (req, res) => {
+  res.status(200).send('✅ Backend is live on Render!');
+});
+
 // -------------------- Server --------------------
 const PORT = process.env.PORT || 5050;
 server.listen(PORT, "0.0.0.0", () => {
