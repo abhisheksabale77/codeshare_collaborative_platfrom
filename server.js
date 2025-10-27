@@ -314,3 +314,14 @@ io.on("connection", (socket) => {
 // -------------------- Server --------------------
 const PORT = process.env.PORT || 5050;
 server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+// -------------------- Serve React Build in Production --------------------
+const path = require("path");
+
+if (process.env.NODE_ENV === "production") {
+  const __dirname1 = path.resolve();
+  app.use(express.static(path.join(__dirname1, "build")));
+
+  app.get("*", (req, res) => {
+    res.sendFile(path.resolve(__dirname1, "build", "index.html"));
+  });
+}
