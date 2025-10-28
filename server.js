@@ -1,5 +1,4 @@
-// server.js
-
+// -------------------- Imports --------------------
 const express = require("express");
 const http = require("http");
 const mongoose = require("mongoose");
@@ -14,19 +13,33 @@ const { default: axios } = require("axios");
 const { HfInference } = require("@huggingface/inference");
 const ACTIONS = require("./src/Actions");
 require("dotenv").config();
+const path = require("path");
 
+// -------------------- App Setup --------------------
 const app = express();
 const server = http.createServer(app);
+
+// -------------------- CORS FIX --------------------
+const FRONTEND_URL = "https://codeshare-collaborative.onrender.com";
+
+app.use(
+  cors({
+    origin: [FRONTEND_URL, "http://localhost:3000"],
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+  })
+);
+
+// -------------------- Socket.io --------------------
 const io = new Server(server, {
   cors: {
-    origin: "*",
+    origin: [FRONTEND_URL, "http://localhost:3000"],
     methods: ["GET", "POST"],
     credentials: true,
   },
 });
 
 app.use(express.json());
-app.use(cors());
 
 // -------------------- MongoDB --------------------
 mongoose
@@ -169,48 +182,12 @@ app.post("/api/suggest-code", async (req, res) => {
 });
 
 // -------------------- JDoodle --------------------
-// app.post("/execute", async (req, res) => {
-//   try {
-//     const { script, language, stdin } = req.body;
-
-//     const payload = {
-//       clientId: process.env.JDOODLE_CLIENT_ID,
-//       clientSecret: process.env.JDOODLE_CLIENT_SECRET,
-//       script,
-//       language,
-//     };
-
-//     if (stdin) payload.stdin = stdin;
-
-//     // ✅ FIX: Only add versionIndex for supported languages, skip JavaScript
-//     if (language.toLowerCase() === "python3") {
-//       payload.versionIndex = "3";
-//     } else if (["c", "cpp"].includes(language.toLowerCase())) {
-//       payload.versionIndex = "0";
-//     }
-//     // For "javascript", no versionIndex added
-
-//     const response = await axios.post(
-//       "https://api.jdoodle.com/v1/execute",
-//       payload
-//     );
-
-//     res.json(response.data);
-//   } catch (error) {
-//     console.error("JDoodle error:", error.response?.data || error.message);
-//     res
-//       .status(error.response?.status || 500)
-//       .json(error.response?.data || { error: "Execution failed" });
-//   }
-// });
-
 app.post("/execute", async (req, res) => {
   try {
     let { script, language, stdin } = req.body;
 
-    // Map language to JDoodle-compatible names
     if (language.toLowerCase() === "javascript") language = "nodejs";
-    if (language.toLowerCase() === "cpp") language = "cpp17"; // optional if needed
+    if (language.toLowerCase() === "cpp") language = "cpp17";
 
     const payload = {
       clientId: process.env.JDOODLE_CLIENT_ID,
@@ -221,10 +198,9 @@ app.post("/execute", async (req, res) => {
 
     if (stdin) payload.stdin = stdin;
 
-    // Only add versionIndex for languages that support it
     const languagesWithVersion = ["python3", "c", "cpp"];
     if (languagesWithVersion.includes(language.toLowerCase())) {
-      payload.versionIndex = "0"; // default version
+      payload.versionIndex = "0";
     }
 
     const response = await axios.post(
@@ -247,9 +223,10 @@ let userChanges = {};
 
 function getAllConnectedClients(roomId) {
   return Array.from(io.sockets.adapter.rooms.get(roomId) || []).map(
-    (socketId) => {
-      return { socketId, username: userSocketMap[socketId] };
-    }
+    (socketId) => ({
+      socketId,
+      username: userSocketMap[socketId],
+    })
   );
 }
 
@@ -312,19 +289,16 @@ io.on("connection", (socket) => {
 });
 
 // -------------------- Serve React Build in Production --------------------
-const path = require("path");
-
 if (process.env.NODE_ENV === "production") {
   const __dirname1 = path.resolve();
   app.use(express.static(path.join(__dirname1, "build")));
-
   app.get("*", (req, res) => {
     res.sendFile(path.resolve(__dirname1, "build", "index.html"));
   });
 }
 
-app.get('/', (req, res) => {
-  res.status(200).send('✅ Backend is live on Render!');
+app.get("/", (req, res) => {
+  res.status(200).send("✅ Backend is live on Render!");
 });
 
 // -------------------- Server --------------------
